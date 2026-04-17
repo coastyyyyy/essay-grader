@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 import os
 
 # =========================
-# GROQ SETUP 🔥
+# GROQ SETUP
 # =========================
 try:
     from groq import Groq
@@ -23,40 +23,36 @@ except:
 st.set_page_config(page_title="AI Essay Grader", layout="wide")
 
 # =========================
-# DARK MODE 🌙
+# 🌙 REAL DARK MODE
 # =========================
 dark_mode = st.toggle("🌙 Dark Mode")
 
-# =========================
-# CSS
-# =========================
-st.markdown("""
+if dark_mode:
+    bg = "#0f172a"
+    text = "white"
+else:
+    bg = "white"
+    text = "black"
+
+st.markdown(f"""
 <style>
-body {
-    background: linear-gradient(270deg, #00c6ff, #0072ff, #00c6ff);
-    background-size: 600% 600%;
-    animation: gradient 12s ease infinite;
-}
+body {{
+    background-color: {bg};
+    color: {text};
+}}
 
-@keyframes gradient {
-    0% {background-position: 0% 50%;}
-    50% {background-position: 100% 50%;}
-    100% {background-position: 0% 50%;}
-}
-
-.stButton>button {
+.stButton>button {{
     background: linear-gradient(45deg, #ff512f, #dd2476);
     color: white;
-    border-radius: 15px;
-    height: 3.5em;
-    width: 260px;
-    font-size: 18px;
-}
+    border-radius: 10px;
+    height: 3em;
+    width: 220px;
+}}
 </style>
 """, unsafe_allow_html=True)
 
 # =========================
-# LOAD MODEL SAFELY
+# LOAD MODEL
 # =========================
 try:
     model = pickle.load(open('model.pkl', 'rb'))
@@ -74,24 +70,17 @@ def clean_text(text):
     text = text.translate(str.maketrans('', '', string.punctuation))
     return text
 
-
 def content_score(text):
     try:
         if not text.strip():
             return 0
-
         vec = vectorizer.transform([clean_text(text)])
         score = float(model.predict(vec)[0])
-
         if score > 10:
             score = score / 10
-
         return round(max(0, min(10, score)), 2)
-
-    except Exception as e:
-        st.error(f"Model Error: {e}")
+    except:
         return 0
-
 
 def grammar_score(text):
     blob = TextBlob(text)
@@ -106,7 +95,6 @@ def grammar_score(text):
 
     return round(score, 2), corrected
 
-
 def structure_score(text):
     sentences = [s for s in text.split('.') if s.strip()]
     if not sentences:
@@ -119,9 +107,54 @@ def structure_score(text):
 
     return round(max(0, min(10, score)), 2)
 
+# =========================
+# 📊 PERCENTILE CALCULATION
+# =========================
+def percentile(score):
+    # simple assumption: avg=5, std~2
+    percentile = int((score / 10) * 100)
+    return max(1, min(99, percentile))
 
 # =========================
-# GROQ AI REWRITE
+# 🧠 AI FEEDBACK
+# =========================
+def ai_feedback(text, score):
+    if USE_AI:
+        try:
+            response = client.chat.completions.create(
+                model="llama3-70b-8192",
+                messages=[
+                    {"role": "system", "content": "You are an expert essay grader."},
+                    {"role": "user", "content": f"""
+Analyze this essay and give:
+
+1. Strengths
+2. Weaknesses
+3. How to improve
+
+Essay:
+{text}
+
+Score: {score}/10
+"""}
+                ]
+            )
+            return response.choices[0].message.content
+        except:
+            return fallback_feedback(score)
+    else:
+        return fallback_feedback(score)
+
+def fallback_feedback(score):
+    if score > 8:
+        return "Excellent work. Improve by adding more examples and deeper insights."
+    elif score > 5:
+        return "Good effort. Improve structure and grammar for higher marks."
+    else:
+        return "Needs improvement. Focus on grammar, clarity, and structure."
+
+# =========================
+# AI REWRITE
 # =========================
 def ai_rewrite(text):
     if USE_AI:
@@ -129,89 +162,73 @@ def ai_rewrite(text):
             response = client.chat.completions.create(
                 model="llama3-70b-8192",
                 messages=[
-                    {"role": "system", "content": "You are an expert academic essay writer."},
-                    {"role": "user", "content": f"""
-Rewrite the following essay to achieve a perfect academic score (10/10).
-
-- Improve CONTENT (add depth, examples)
-- Improve STRUCTURE (intro, body, conclusion)
-- Fix GRAMMAR completely
-- Make it formal and high-quality
-
-Essay:
-{text}
-"""}
+                    {"role": "user", "content": f"Rewrite this essay to make it perfect:\n{text}"}
                 ]
             )
             return response.choices[0].message.content
         except:
-            return fallback_rewrite(text)
-    else:
-        return fallback_rewrite(text)
-
+            return text
+    return text
 
 # =========================
-# FALLBACK (NO API)
-# =========================
-def fallback_rewrite(text):
-    blob = TextBlob(text)
-    corrected = str(blob.correct())
-
-    intro = "This essay provides a comprehensive discussion on the topic. "
-    body = corrected + " This topic plays a crucial role in modern society and influences various aspects of life."
-    conclusion = " In conclusion, the topic is highly significant and requires further attention."
-
-    return intro + "\n\n" + body + "\n\n" + conclusion
-
-
-# =========================
-# EVALUATION
+# EVALUATE
 # =========================
 def evaluate(text):
     c = content_score(text)
     g, corrected = grammar_score(text)
     s = structure_score(text)
-    final = round((c * 0.5 + g * 0.25 + s * 0.25), 2)
-    return c, g, s, final, corrected
-
+    final = round((c*0.5 + g*0.25 + s*0.25),2)
+    return c,g,s,final,corrected
 
 # =========================
 # UI
 # =========================
-st.title("✨ AI Essay Grader (Groq Powered)")
+st.title("✨ AI Essay Grader")
 
 essay = st.text_area("✍️ Enter your essay:", height=250)
 
 if st.button("🚀 Evaluate Essay"):
 
     if essay.strip() == "":
-        st.warning("Please enter an essay")
-
+        st.warning("Enter essay")
     else:
-        c, g, s, final, corrected = evaluate(essay)
+        c,g,s,final,corrected = evaluate(essay)
 
-        # SCORES
-        col1, col2, col3 = st.columns(3)
-        col1.metric("📚 Content", c)
-        col2.metric("🧠 Grammar", g)
-        col3.metric("🏗 Structure", s)
+        # METRICS
+        col1,col2,col3,col4 = st.columns(4)
+        col1.metric("Content", c)
+        col2.metric("Grammar", g)
+        col3.metric("Structure", s)
+        col4.metric("Final", final)
 
-        st.success(f"🎯 Final Score: {final}/10")
+        # PERCENTILE
+        p = percentile(final)
+        st.info(f"📊 You scored higher than {p}% of students")
 
-        # GRAPH
+        # PROGRESS
+        st.progress(int(final*10))
+
+        # RADAR
         fig = go.Figure()
-        fig.add_trace(go.Bar(
-            x=["Content", "Grammar", "Structure"],
-            y=[c, g, s]
+        fig.add_trace(go.Scatterpolar(
+            r=[c,g,s,c],
+            theta=["Content","Grammar","Structure","Content"],
+            fill='toself'
         ))
-        st.plotly_chart(fig)
+        fig.update_layout(polar=dict(radialaxis=dict(range=[0,10])))
+        st.plotly_chart(fig, use_container_width=True)
+
+        # AI FEEDBACK
+        st.subheader("🧠 AI Feedback")
+        feedback = ai_feedback(essay, final)
+        st.write(feedback)
 
         # CORRECTED
-        st.subheader("✍️ Grammar Corrected")
+        st.subheader("✍️ Corrected")
         st.write(corrected)
 
-        # AI REWRITE
-        st.subheader("🚀 AI High-Score Essay")
+        # REWRITE
+        st.subheader("🚀 Improved Essay")
         improved = ai_rewrite(essay)
         st.write(improved)
 
