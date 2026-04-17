@@ -86,15 +86,13 @@ def content_score(text):
     words = len(text.split())
 
     if words < 50:
-        score = 4
+        return 4
     elif words < 100:
-        score = 6
+        return 6
     elif words < 200:
-        score = 8
+        return 8
     else:
-        score = 10
-
-    return score
+        return 10
 
 def grammar_score(text):
     blob = TextBlob(text)
