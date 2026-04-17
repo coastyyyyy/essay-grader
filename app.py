@@ -83,18 +83,6 @@ def clean_text(text):
     return text
 
 def content_score(text):
-<<<<<<< HEAD
-    words = len(text.split())
-
-    if words < 50:
-        return 4
-    elif words < 100:
-        return 6
-    elif words < 200:
-        return 8
-    else:
-        return 10
-=======
     try:
         clean = clean_text(text)
 
@@ -107,8 +95,7 @@ def content_score(text):
         # convert to number safely
         score = float(pred[0])
 
-        # OPTIONAL: scale depending on your dataset
-        # If your dataset score was 0–100 → convert to 0–10
+        # scale if needed
         if score > 10:
             score = score / 10
 
@@ -120,7 +107,7 @@ def content_score(text):
     except Exception as e:
         st.error(f"Model Error: {e}")
         return 0
->>>>>>> 09e0fe97 (final working app)
+
 
 def grammar_score(text):
     blob = TextBlob(text)
