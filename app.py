@@ -3,7 +3,6 @@ import pickle
 import re
 import string
 import numpy as np
-import textstat
 from textblob import TextBlob
 import plotly.graph_objects as go
 import os
