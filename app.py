@@ -108,7 +108,6 @@ def content_score(text):
         st.error(f"Model Error: {e}")
         return 0
 
-
 def grammar_score(text):
     blob = TextBlob(text)
     corrected = blob.correct()
