@@ -2,7 +2,7 @@ streamlit
 scikit-learn
 pandas
 numpy
-textstat
+textstat==0.7.3
 textblob
 plotly
 groq
