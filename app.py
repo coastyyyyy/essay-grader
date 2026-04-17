@@ -59,7 +59,19 @@ body {
 # LOAD MODEL
 # =========================
 model = pickle.load(open('model.pkl', 'rb'))
-vectorizer = pickle.load(open('vectorizer.pkl', 'rb'))
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+vectorizer = TfidfVectorizer()
+
+sample_texts = [
+    "education is important",
+    "technology helps life",
+    "students should study daily",
+    "hard work gives success",
+    "environment must be protected"
+]
+
+vectorizer.fit(sample_texts)
 
 # =========================
 # FUNCTIONS
