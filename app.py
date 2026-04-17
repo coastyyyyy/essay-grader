@@ -87,10 +87,15 @@ def structure_score(text):
     sentences = [s for s in text.split('.') if s.strip()]
     if not sentences:
         return 0
+
     avg_len = np.mean([len(s.split()) for s in sentences])
-    readability = textstat.flesch_reading_ease(text)
-    score = (avg_len/20) + (readability/100)*5
-    return round(max(0,min(10,score)),2)
+
+    # custom readability score
+    words = len(text.split())
+    readability = max(0, 100 - (avg_len * 2))
+
+    score = (avg_len / 20) + (readability / 100) * 5
+    return round(max(0, min(10, score)), 2)
 
 # =========================
 # 🔥 GROQ AI REWRITE
