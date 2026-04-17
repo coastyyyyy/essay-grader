@@ -83,8 +83,18 @@ def clean_text(text):
     return text
 
 def content_score(text):
-    vec = vectorizer.transform([clean_text(text)])
-    return round(model.predict(vec)[0], 2)
+    words = len(text.split())
+
+    if words < 50:
+        score = 4
+    elif words < 100:
+        score = 6
+    elif words < 200:
+        score = 8
+    else:
+        score = 10
+
+    return score
 
 def grammar_score(text):
     blob = TextBlob(text)
