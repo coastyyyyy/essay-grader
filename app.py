@@ -28,7 +28,7 @@ st.set_page_config(page_title="AI Essay Grader", layout="wide")
 dark_mode = st.toggle("🌙 Dark Mode")
 
 # =========================
-# CSS (ANIMATED UI)
+# CSS
 # =========================
 st.markdown("""
 <style>
@@ -56,22 +56,14 @@ body {
 """, unsafe_allow_html=True)
 
 # =========================
-# LOAD MODEL
+# LOAD MODEL SAFELY
 # =========================
-model = pickle.load(open('model.pkl', 'rb'))
-from sklearn.feature_extraction.text import TfidfVectorizer
-
-vectorizer = TfidfVectorizer()
-
-sample_texts = [
-    "education is important",
-    "technology helps life",
-    "students should study daily",
-    "hard work gives success",
-    "environment must be protected"
-]
-
-vectorizer.fit(sample_texts)
+try:
+    model = pickle.load(open('model.pkl', 'rb'))
+    vectorizer = pickle.load(open('vectorizer.pkl', 'rb'))
+except:
+    st.error("❌ model.pkl or vectorizer.pkl not found")
+    st.stop()
 
 # =========================
 # FUNCTIONS
@@ -82,39 +74,38 @@ def clean_text(text):
     text = text.translate(str.maketrans('', '', string.punctuation))
     return text
 
+
 def content_score(text):
     try:
-        clean = clean_text(text)
+        if not text.strip():
+            return 0
 
-        # transform text
-        vec = vectorizer.transform([clean])
+        vec = vectorizer.transform([clean_text(text)])
+        score = float(model.predict(vec)[0])
 
-        # prediction
-        pred = model.predict(vec)
-
-        # convert to number safely
-        score = float(pred[0])
-
-        # scale if needed
         if score > 10:
             score = score / 10
 
-        # limit range
-        score = max(0, min(10, score))
-
-        return round(score, 2)
+        return round(max(0, min(10, score)), 2)
 
     except Exception as e:
         st.error(f"Model Error: {e}")
         return 0
 
+
 def grammar_score(text):
     blob = TextBlob(text)
     corrected = blob.correct()
     words = len(text.split())
+
+    if words == 0:
+        return 0, text
+
     errors = sum(1 for o, c in zip(text.split(), str(corrected).split()) if o != c)
-    score = max(0, 10 - (errors/words)*50) if words else 0
-    return round(score,2), corrected
+    score = max(0, 10 - (errors / words) * 50)
+
+    return round(score, 2), corrected
+
 
 def structure_score(text):
     sentences = [s for s in text.split('.') if s.strip()]
@@ -122,16 +113,15 @@ def structure_score(text):
         return 0
 
     avg_len = np.mean([len(s.split()) for s in sentences])
-
-    # custom readability score
-    words = len(text.split())
     readability = max(0, 100 - (avg_len * 2))
 
     score = (avg_len / 20) + (readability / 100) * 5
+
     return round(max(0, min(10, score)), 2)
 
+
 # =========================
-# 🔥 GROQ AI REWRITE
+# GROQ AI REWRITE
 # =========================
 def ai_rewrite(text):
     if USE_AI:
@@ -159,6 +149,7 @@ Essay:
     else:
         return fallback_rewrite(text)
 
+
 # =========================
 # FALLBACK (NO API)
 # =========================
@@ -172,6 +163,7 @@ def fallback_rewrite(text):
 
     return intro + "\n\n" + body + "\n\n" + conclusion
 
+
 # =========================
 # EVALUATION
 # =========================
@@ -179,22 +171,24 @@ def evaluate(text):
     c = content_score(text)
     g, corrected = grammar_score(text)
     s = structure_score(text)
-    final = round((c*0.5 + g*0.25 + s*0.25),2)
-    return c,g,s,final,corrected
+    final = round((c * 0.5 + g * 0.25 + s * 0.25), 2)
+    return c, g, s, final, corrected
+
 
 # =========================
 # UI
 # =========================
 st.title("✨ AI Essay Grader (Groq Powered)")
+
 essay = st.text_area("✍️ Enter your essay:", height=250)
 
 if st.button("🚀 Evaluate Essay"):
-    
+
     if essay.strip() == "":
-        st.warning("Please enter essay")
-    
+        st.warning("Please enter an essay")
+
     else:
-        c,g,s,final,corrected = evaluate(essay)
+        c, g, s, final, corrected = evaluate(essay)
 
         # SCORES
         col1, col2, col3 = st.columns(3)
@@ -207,8 +201,8 @@ if st.button("🚀 Evaluate Essay"):
         # GRAPH
         fig = go.Figure()
         fig.add_trace(go.Bar(
-            x=["Content","Grammar","Structure"],
-            y=[c,g,s]
+            x=["Content", "Grammar", "Structure"],
+            y=[c, g, s]
         ))
         st.plotly_chart(fig)
 
@@ -216,8 +210,8 @@ if st.button("🚀 Evaluate Essay"):
         st.subheader("✍️ Grammar Corrected")
         st.write(corrected)
 
-        # 🔥 AI REWRITE
-        st.subheader("🚀 AI High-Score Essay (Groq)")
+        # AI REWRITE
+        st.subheader("🚀 AI High-Score Essay")
         improved = ai_rewrite(essay)
         st.write(improved)
 
