@@ -72,8 +72,31 @@ def clean_text(text):
     return text
 
 def content_score(text):
-    vec = vectorizer.transform([clean_text(text)])
-    return round(model.predict(vec)[0], 2)
+    try:
+        clean = clean_text(text)
+
+        # transform text
+        vec = vectorizer.transform([clean])
+
+        # prediction
+        pred = model.predict(vec)
+
+        # convert to number safely
+        score = float(pred[0])
+
+        # OPTIONAL: scale depending on your dataset
+        # If your dataset score was 0–100 → convert to 0–10
+        if score > 10:
+            score = score / 10
+
+        # limit range
+        score = max(0, min(10, score))
+
+        return round(score, 2)
+
+    except Exception as e:
+        st.error(f"Model Error: {e}")
+        return 0
 
 def grammar_score(text):
     blob = TextBlob(text)
