@@ -20,19 +20,15 @@ except:
 # =========================
 # PAGE CONFIG
 # =========================
-st.set_page_config(page_title="AI Essay Grader", layout="wide")
+st.set_page_config(page_title="AI Essay Analyzer", layout="wide")
 
 # =========================
-# 🌙 REAL DARK MODE
+# DARK MODE
 # =========================
 dark_mode = st.toggle("🌙 Dark Mode")
 
-if dark_mode:
-    bg = "#0f172a"
-    text = "white"
-else:
-    bg = "white"
-    text = "black"
+bg = "#0f172a" if dark_mode else "white"
+text = "white" if dark_mode else "black"
 
 st.markdown(f"""
 <style>
@@ -70,15 +66,19 @@ def clean_text(text):
     text = text.translate(str.maketrans('', '', string.punctuation))
     return text
 
+# 👉 FIXED: convert classification → score
 def content_score(text):
     try:
         if not text.strip():
             return 0
+
         vec = vectorizer.transform([clean_text(text)])
-        score = float(model.predict(vec)[0])
-        if score > 10:
-            score = score / 10
-        return round(max(0, min(10, score)), 2)
+        pred = model.predict(vec)[0]
+
+        # Convert 0/1 → score
+        score = 8 if pred == 1 else 4
+
+        return score
     except:
         return 0
 
@@ -107,16 +107,11 @@ def structure_score(text):
 
     return round(max(0, min(10, score)), 2)
 
-# =========================
-# 📊 PERCENTILE CALCULATION
-# =========================
 def percentile(score):
-    # simple assumption: avg=5, std~2
-    percentile = int((score / 10) * 100)
-    return max(1, min(99, percentile))
+    return max(1, min(99, int((score / 10) * 100)))
 
 # =========================
-# 🧠 AI FEEDBACK
+# AI FEEDBACK
 # =========================
 def ai_feedback(text, score):
     if USE_AI:
@@ -130,7 +125,7 @@ Analyze this essay and give:
 
 1. Strengths
 2. Weaknesses
-3. How to improve
+3. Improvements
 
 Essay:
 {text}
@@ -142,28 +137,22 @@ Score: {score}/10
             return response.choices[0].message.content
         except:
             return fallback_feedback(score)
-    else:
-        return fallback_feedback(score)
+    return fallback_feedback(score)
 
 def fallback_feedback(score):
     if score > 8:
-        return "Excellent work. Improve by adding more examples and deeper insights."
+        return "Excellent work. Add deeper insights."
     elif score > 5:
-        return "Good effort. Improve structure and grammar for higher marks."
+        return "Good effort. Improve grammar and structure."
     else:
-        return "Needs improvement. Focus on grammar, clarity, and structure."
+        return "Needs improvement. Focus on clarity and grammar."
 
-# =========================
-# AI REWRITE
-# =========================
 def ai_rewrite(text):
     if USE_AI:
         try:
             response = client.chat.completions.create(
                 model="llama3-70b-8192",
-                messages=[
-                    {"role": "user", "content": f"Rewrite this essay to make it perfect:\n{text}"}
-                ]
+                messages=[{"role": "user", "content": f"Rewrite this essay better:\n{text}"}]
             )
             return response.choices[0].message.content
         except:
@@ -171,19 +160,19 @@ def ai_rewrite(text):
     return text
 
 # =========================
-# EVALUATE
+# EVALUATION
 # =========================
 def evaluate(text):
     c = content_score(text)
     g, corrected = grammar_score(text)
     s = structure_score(text)
-    final = round((c*0.5 + g*0.25 + s*0.25),2)
-    return c,g,s,final,corrected
+    final = round((c*0.5 + g*0.25 + s*0.25), 2)
+    return c, g, s, final, corrected
 
 # =========================
 # UI
 # =========================
-st.title("✨ AI Essay Grader")
+st.title("✨ AI Essay Analyzer")
 
 essay = st.text_area("✍️ Enter your essay:", height=250)
 
@@ -192,46 +181,37 @@ if st.button("🚀 Evaluate Essay"):
     if essay.strip() == "":
         st.warning("Enter essay")
     else:
-        c,g,s,final,corrected = evaluate(essay)
+        c, g, s, final, corrected = evaluate(essay)
 
-        # METRICS
-        col1,col2,col3,col4 = st.columns(4)
+        col1, col2, col3, col4 = st.columns(4)
         col1.metric("Content", c)
         col2.metric("Grammar", g)
         col3.metric("Structure", s)
         col4.metric("Final", final)
 
-        # PERCENTILE
         p = percentile(final)
-        st.info(f"📊 You scored higher than {p}% of students")
+        st.info(f"📊 Better than {p}% students")
 
-        # PROGRESS
-        st.progress(int(final*10))
+        st.progress(int(final * 10))
 
-        # RADAR
         fig = go.Figure()
         fig.add_trace(go.Scatterpolar(
-            r=[c,g,s,c],
-            theta=["Content","Grammar","Structure","Content"],
+            r=[c, g, s, c],
+            theta=["Content", "Grammar", "Structure", "Content"],
             fill='toself'
         ))
-        fig.update_layout(polar=dict(radialaxis=dict(range=[0,10])))
+        fig.update_layout(polar=dict(radialaxis=dict(range=[0, 10])))
         st.plotly_chart(fig, use_container_width=True)
 
-        # AI FEEDBACK
-        st.subheader("🧠 AI Feedback")
-        feedback = ai_feedback(essay, final)
-        st.write(feedback)
+        st.subheader("🧠 Feedback")
+        st.write(ai_feedback(essay, final))
 
-        # CORRECTED
-        st.subheader("✍️ Corrected")
+        st.subheader("✍️ Corrected Essay")
         st.write(corrected)
 
-        # REWRITE
-        st.subheader("🚀 Improved Essay")
+        st.subheader("🚀 Improved Version")
         improved = ai_rewrite(essay)
         st.write(improved)
 
-        # NEW SCORE
         new_score = content_score(improved)
         st.success(f"🔥 Improved Score: {new_score}/10")
